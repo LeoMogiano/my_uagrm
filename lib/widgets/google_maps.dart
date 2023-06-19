@@ -1,5 +1,7 @@
+// PARECIERA QUE NO TIENE USO
+
 import 'dart:math';
-import 'dart:typed_data';
+/* import 'dart:typed_data'; */
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';

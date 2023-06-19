@@ -2,7 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
-
+import 'package:sig_grupL/widgets/location_info.dart';
+import 'package:material_floating_search_bar_2/material_floating_search_bar_2.dart';
 import 'package:location/location.dart';
 import 'package:image/image.dart' as img;
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -13,8 +14,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:material_floating_search_bar_2/material_floating_search_bar_2.dart';
-
 
 import '../controllers/api_controller.dart';
 import 'package:sig_grupL/utils/utils.dart';
@@ -180,9 +179,22 @@ class _HomeState extends State<Home> {
       // Calcula los límites del polyline
       LatLngBounds bounds = boundsFromLatLngList(allPoints);
 
-      // Ajusta la cámara para mostrar los límites del polyline en toda la pantalla
+      // Ajusta la cámara para mostrar los límites del polyline en toda la pantalla 
+      //Anterior Manera
+      /* controller.animateCamera(
+        CameraUpdate.newLatLngBounds(bounds, 140.0,),
+      ); */
+
       controller.animateCamera(
-        CameraUpdate.newLatLngBounds(bounds, 90.0),
+        CameraUpdate.newCameraPosition(
+          CameraPosition(
+            target: LatLng(
+              (bounds.northeast.latitude + bounds.southwest.latitude) / 2 - 0.006, // Ajusta este valor para desplazar más hacia el sur
+              (bounds.northeast.longitude + bounds.southwest.longitude) / 2,
+            ),
+            zoom: 13.4,
+          ),
+        ),
       );
     }
 
@@ -252,6 +264,21 @@ class _HomeState extends State<Home> {
     return distance;
   }
 
+  String formatTime(double time) {
+    int hours = (time / 60).floor();
+    int minutes = (time % 60).round();
+
+    String formattedTime;
+
+    if (hours > 0) {
+      formattedTime = '$hours hr $minutes min';
+    } else {
+      formattedTime = '$minutes min';
+    }
+
+    return formattedTime;
+  }
+
   void calculateTime() {
     // Velocidad promedio a pie en km/h
     const double walkingSpeed = 5.0;
@@ -271,18 +298,9 @@ class _HomeState extends State<Home> {
       print('Tiempo estimado a pie: $walkingTimeFormatted');
       print('Tiempo estimado en automóvil: $carTimeFormatted');
     }
+
     tiempoAuto = carTimeFormatted;
     tiempoCaminando = walkingTimeFormatted;
-  }
-
-  String formatTime(double time) {
-    int hours = (time / 60).floor();
-    int minutes = (time % 60).round();
-
-    String hoursString = hours.toString().padLeft(2, '0');
-    String minutesString = minutes.toString().padLeft(2, '0');
-
-    return '$hoursString:$minutesString';
   }
 
   void removeMarker(MarkerId markerId) {
@@ -463,7 +481,7 @@ class _HomeState extends State<Home> {
                   margin:
                       const EdgeInsets.symmetric(horizontal: 5, vertical: 5),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 20),
+                    padding: const EdgeInsets.symmetric(vertical: 18),
                     margin:
                         const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                     width: double.infinity,
@@ -513,131 +531,20 @@ class _HomeState extends State<Home> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: [
-                            Expanded(
-                              flex: 1,
-                              child: Card(
-                                margin: const EdgeInsets.symmetric(
-                                    horizontal: 10, vertical: 20),
-                                elevation: 5,
-                                shadowColor: Colors.black,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 15, vertical: 15),
-                                  child: Column(
-                                    children: [
-                                      const Icon(
-                                        Icons.directions_car,
-                                        color: Colors.black,
-                                      ),
-                                      const Text(
-                                        "Auto :",
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.black,
-                                        ),
-                                      ),
-                                      Text(
-                                        "$tiempoAuto min",
-                                        textAlign: TextAlign.center,
-                                        style: const TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w400,
-                                          color: Colors.black,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
+                            LocationInfo(
+                              icon: Icons.directions_car,
+                              title: "Auto",
+                              description: tiempoAuto,
                             ),
-                            Expanded(
-                              flex: 1,
-                              child: Card(
-                                margin: const EdgeInsets.symmetric(
-                                    horizontal: 10, vertical: 20),
-                                elevation: 5,
-                                shadowColor: Colors.black,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 15, vertical: 15),
-                                  child: Column(
-                                    children: [
-                                      const Icon(
-                                        Icons.directions_walk,
-                                        color: Colors.black,
-                                      ),
-                                      const Text(
-                                        "Pie :",
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.black,
-                                        ),
-                                      ),
-                                      Text(
-                                        "$tiempoCaminando hr",
-                                        textAlign: TextAlign.center,
-                                        style: const TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w400,
-                                          color: Colors.black,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
+                            LocationInfo(
+                              icon: Icons.directions_walk,
+                              title: "Pie",
+                              description: tiempoCaminando,
                             ),
-                            Expanded(
-                              flex: 1,
-                              child: Card(
-                                margin: const EdgeInsets.symmetric(
-                                    horizontal: 10, vertical: 20),
-                                elevation: 5,
-                                shadowColor: Colors.black,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 15, vertical: 15),
-                                  child: Column(
-                                    children: [
-                                      const Icon(
-                                        Icons.place,
-                                        color: Colors.black,
-                                      ),
-                                      const Text(
-                                        "Distancia :",
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.black,
-                                        ),
-                                      ),
-                                      Text(
-                                        "$totalDistance km",
-                                        textAlign: TextAlign.center,
-                                        style: const TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w400,
-                                          color: Colors.black,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
+                            LocationInfo(
+                              icon: Icons.place,
+                              title: "Distancia",
+                              description: "$totalDistance km",
                             ),
                           ],
                         ),
