@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
-import 'package:sig_grupL/widgets/location_info.dart';
 import 'package:material_floating_search_bar_2/material_floating_search_bar_2.dart';
 import 'package:location/location.dart';
 import 'package:image/image.dart' as img;
@@ -14,6 +13,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:sig_grupL/widgets/widgets.dart';
 
 import '../controllers/api_controller.dart';
 import 'package:sig_grupL/utils/utils.dart';
@@ -49,6 +49,19 @@ class _HomeState extends State<Home> {
   bool isLoading = false;
   String tiempoCaminando = '';
   String tiempoAuto = '';
+
+  TravelMode travelMode = TravelMode.driving; // Modo de viaje
+  LatLng position = const LatLng(0, 0);
+  bool areCalculationsDone = false; // Control de estado para los cálculos
+
+  Set<Polyline> autoPolylines = {};
+  Set<Polyline> walkingPolylines = {};
+
+  List<Map<String, Object>> jsonData = [];
+  List<String> datosDescription = [];
+  List<String> datosGroup = [];
+
+  final TextEditingController _searchController = TextEditingController();
 
   Future<GoogleMapController> get _mapController async {
     return await _completer.future;
@@ -151,52 +164,79 @@ class _HomeState extends State<Home> {
 
   void createPolylines(LatLng position) async {
     PolylinePoints polylinePoints = PolylinePoints();
+    List<LatLng> newPolylineCoordinates =
+        []; // Nuevas coordenadas de la polilínea
 
     PolylineResult result = await polylinePoints.getRouteBetweenCoordinates(
       apiGoogle,
       PointLatLng(inicioLatitude, inicioLongitude),
       PointLatLng(position.latitude, position.longitude),
+      travelMode: travelMode,
     );
 
     if (result.status == 'OK') {
       for (var point in result.points) {
+        newPolylineCoordinates.add(LatLng(point.latitude, point.longitude));
         polylineCoordinates.add(LatLng(point.latitude, point.longitude));
       }
 
-      calculatePolylineDistance();
-      calculateTime();
-
-      // Obtén el GoogleMapController
-      GoogleMapController controller = await _mapController;
-
-      // Crea una lista de LatLng que contiene todos los puntos del polyline
-      List<LatLng> allPoints = [
-        LatLng(inicioLatitude, inicioLongitude),
-        ...polylineCoordinates,
-        LatLng(position.latitude, position.longitude),
-      ];
-
-      // Calcula los límites del polyline
-      LatLngBounds bounds = boundsFromLatLngList(allPoints);
-
-      // Ajusta la cámara para mostrar los límites del polyline en toda la pantalla 
-      //Anterior Manera
-      /* controller.animateCamera(
-        CameraUpdate.newLatLngBounds(bounds, 140.0,),
-      ); */
-
-      controller.animateCamera(
-        CameraUpdate.newCameraPosition(
-          CameraPosition(
-            target: LatLng(
-              (bounds.northeast.latitude + bounds.southwest.latitude) / 2 - 0.006, // Ajusta este valor para desplazar más hacia el sur
-              (bounds.northeast.longitude + bounds.southwest.longitude) / 2,
-            ),
-            zoom: 13.4,
+      // Actualiza las polilíneas según el modo de transporte seleccionado
+      if (travelMode == TravelMode.driving) {
+        autoPolylines = {
+          Polyline(
+            polylineId: const PolylineId('autoPolyline'),
+            color: Colors.blue,
+            points: newPolylineCoordinates,
+            width: 5,
           ),
-        ),
-      );
+        };
+      } else if (travelMode == TravelMode.walking) {
+        walkingPolylines = {
+          Polyline(
+            polylineId: const PolylineId('walkingPolyline'),
+            color: Colors.green,
+            points: newPolylineCoordinates,
+            width: 5,
+          ),
+        };
+      }
+      if (!areCalculationsDone) {
+        // Realiza los cálculos solo si no se han realizado antes
+        // Calcula la distancia nuevamente
+        calculatePolylineDistance(polylineCoordinates);
+        calculateTime();
+        calculatePolylineDistance(polylineCoordinates);
+
+        // Actualiza el control de estado
+        areCalculationsDone = true;
+      }
     }
+
+    // Obtén el GoogleMapController
+    GoogleMapController controller = await _mapController;
+
+    // Crea una lista de LatLng que contiene todos los puntos del polyline
+    List<LatLng> allPoints = [
+      LatLng(inicioLatitude, inicioLongitude),
+      ...polylineCoordinates,
+      LatLng(position.latitude, position.longitude),
+    ];
+
+    // Calcula los límites del polyline
+    LatLngBounds bounds = boundsFromLatLngList(allPoints);
+
+    // Ajusta la cámara para mostrar los límites del polyline en toda la pantalla
+    controller.animateCamera(
+      CameraUpdate.newCameraPosition(
+        CameraPosition(
+          target: LatLng(
+            (bounds.northeast.latitude + bounds.southwest.latitude) / 2 - 0.006,
+            (bounds.northeast.longitude + bounds.southwest.longitude) / 2,
+          ),
+          zoom: 13.4,
+        ),
+      ),
+    );
 
     bandera = true;
 
@@ -227,7 +267,7 @@ class _HomeState extends State<Home> {
     );
   }
 
-  void calculatePolylineDistance() {
+  void calculatePolylineDistance(List<LatLng> polylineCoordinates) {
     totalDistance = 0.0;
 
     for (int i = 0; i < polylineCoordinates.length - 1; i++) {
@@ -307,13 +347,12 @@ class _HomeState extends State<Home> {
     setState(() {
       markers.removeWhere((marker) => marker.markerId == markerId);
       polylineCoordinates.clear();
+      autoPolylines.clear();
+      walkingPolylines.clear();
+      areCalculationsDone = false;
       mostrarMarcador = true;
     });
   }
-
-  List<Map<String, Object>> jsonData = [];
-  List<String> datosDescription = [];
-  List<String> datosGroup = [];
 
   void search(String query) {
     final matchQuery = getMatchedResults(query);
@@ -358,7 +397,7 @@ class _HomeState extends State<Home> {
 
   getAddressFromLatLng() async {
     try {
-      print("Entro a getAddressFromLatLng()");
+      /* print("Entro a getAddressFromLatLng()"); */
       if (isLoading) {
         setState(() {});
       } else {
@@ -383,8 +422,6 @@ class _HomeState extends State<Home> {
       });
     }
   }
-
-  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
@@ -443,244 +480,106 @@ class _HomeState extends State<Home> {
                 compassEnabled: false,
                 markers: markers,
                 onCameraMove: (CameraPosition? position) {
-                  if (kDebugMode) {
+                  /* if (kDebugMode) {
                     print("Camera Move");
-                  }
+                  } */ // ! ESTO GENERA PROBLEMAS A LA HORA DE HACER DEBUG - LO PONE LENTO
                   isLoading = false;
                   iniLocation = position!.target;
                   isLoading = true;
                   getAddressFromLatLng();
                 },
                 onCameraIdle: () {
-                  if (kDebugMode) {
+                  /* if (kDebugMode) {
                     print("Camera Idle");
-                  }
+                  } */ // ! IGUAL ESTO
                   isLoading = false;
                   getAddressFromLatLng();
                 },
                 polylines: {
-                  Polyline(
-                    polylineId: const PolylineId('polyLine'),
-                    color: Colors.blue,
-                    points: polylineCoordinates,
-                    width: 5,
-                  ),
+                  if (travelMode == TravelMode.driving) ...autoPolylines,
+                  if (travelMode == TravelMode.walking) ...walkingPolylines,
                 },
               ),
             ),
           if (dosPuntos)
-            Align(
-              alignment: Alignment.bottomCenter,
-              child: IntrinsicHeight(
-                child: Card(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  elevation: 6,
-                  shadowColor: Colors.black,
-                  margin:
-                      const EdgeInsets.symmetric(horizontal: 5, vertical: 5),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 18),
-                    margin:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                    width: double.infinity,
-                    color: Colors.white,
+            TrayectoriaInfo(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment
+                    .start, // Centrar los elementos horizontalmente
+                children: [
+                  //DESCRIPCION
+                  Container(
+                    margin: const EdgeInsets.only(left: 10),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment
-                          .start, // Centrar los elementos horizontalmente
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        //DESCRIPCION
-                        Container(
-                          margin: const EdgeInsets.only(left: 10),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                description,
-                                textAlign: TextAlign.start,
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.black,
-                                ),
-                              ),
-                              //GRUPO
-                              Text(
-                                group,
-                                textAlign: TextAlign.start,
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w400,
-                                  color: Colors.black,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        /* Text(
-                          "Iniciales: $initials",
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black,
-                          ),
-                        ), */
-
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: [
-                            LocationInfo(
-                              icon: Icons.directions_car,
-                              title: "Auto",
-                              description: tiempoAuto,
-                            ),
-                            LocationInfo(
-                              icon: Icons.directions_walk,
-                              title: "Pie",
-                              description: tiempoCaminando,
-                            ),
-                            LocationInfo(
-                              icon: Icons.place,
-                              title: "Distancia",
-                              description: "$totalDistance km",
-                            ),
-                          ],
-                        ),
-
-                        /* Text(
-                          "Distancia: $totalDistance km",
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black,
-                          ),
-                        ),
                         Text(
-                          "Tiempo en auto: $tiempoAuto hr",
-                          textAlign: TextAlign.center,
+                          description,
+                          textAlign: TextAlign.start,
                           style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w500,
                             color: Colors.black,
                           ),
                         ),
+                        //GRUPO
                         Text(
-                          "Tiempo a pie: $tiempoCaminando hr",
-                          textAlign: TextAlign.center,
+                          group,
+                          textAlign: TextAlign.start,
                           style: const TextStyle(
                             fontSize: 14,
-                            fontWeight: FontWeight.bold,
+                            fontWeight: FontWeight.w400,
                             color: Colors.black,
                           ),
-                        ), */
+                        ),
                       ],
                     ),
                   ),
-                ),
+
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      LocationInfo(
+                        icon: Icons.directions_car,
+                        title: "Auto",
+                        description: tiempoAuto,
+                        isSelected: travelMode == TravelMode.driving,
+                        onPressed: () {
+                          setState(() {
+                            travelMode = TravelMode.driving;
+                          });
+                          createPolylines(position);
+                        },
+                      ),
+                      LocationInfo(
+                        icon: Icons.directions_walk,
+                        title: "Pie",
+                        description: tiempoCaminando,
+                        isSelected: travelMode == TravelMode.walking,
+                        onPressed: () {
+                          setState(() {
+                            travelMode = TravelMode.walking;
+                          });
+                          createPolylines(position);
+                        },
+                      ),
+                      LocationInfo(
+                        icon: Icons.place,
+                        title: "Distancia",
+                        description: "$totalDistance km",
+                        isSelected: false,
+                        onPressed: () {},
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
           if (finMarker == false && mostrarMarcador == true)
-            Align(
-              alignment: Alignment.bottomCenter,
-              child: Container(
-                width: double.infinity,
-                height: 60,
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(30),
-                      topRight: Radius.circular(30)),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.only(
-                      left: 25, right: 25, top: 10, bottom: 10),
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      minimumSize: const Size(double.infinity, 50),
-                    ),
-                    child: const Text('Marcar Inicio'),
-                    onPressed: () {
-                      showModalBottomSheet(
-                          context: context,
-                          builder: (BuildContext context) {
-                            return Container(
-                              decoration: const BoxDecoration(
-                                color: Colors.white,
-                              ),
-                              height: 140,
-                              child: Align(
-                                alignment: Alignment.topCenter,
-                                child: Column(
-                                  children: [
-                                    Padding(
-                                      padding: const EdgeInsets.all(8.0),
-                                      child: ElevatedButton(
-                                        onPressed: () {
-                                          mostrarMarcador = false;
-                                          setState(() {});
-                                          Navigator.of(context).pop();
-                                        },
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.white,
-                                          foregroundColor: Colors.black,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(10),
-                                          ),
-                                          minimumSize:
-                                              const Size(double.infinity, 50),
-                                        ),
-                                        child: const Text('Marcar en el mapa'),
-                                      ),
-                                    ),
-                                    Padding(
-                                      padding: const EdgeInsets.all(8.0),
-                                      child: ElevatedButton(
-                                          onPressed: () {
-                                            inicioLatitude =
-                                                currentLocation!.latitude!;
-                                            inicioLongitude = currentLocation!
-                                                .longitude!; //currentLocation!.longitude!;
-                                            mostrarMarcador = true;
-                                            miUbicacion = true;
-                                            bandera = false;
-                                            addMarker(LatLng(
-                                              currentLocation!.latitude!,
-                                              currentLocation!.longitude!,
-                                            ));
-                                            finMarker = true;
-                                            Navigator.of(context).pop();
-                                          },
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors.white,
-                                            foregroundColor: Colors.black,
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(10),
-                                            ),
-                                            minimumSize:
-                                                const Size(double.infinity, 50),
-                                          ),
-                                          child:
-                                              const Text("Desde mi ubicación")),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          });
-                    },
-                  ),
-                ),
-              ),
+            PanelMarcaInicio(
+              onPressed: () {
+                modalMarcaInicio(context);
+              },
             ),
           if (mostrarMarcador == false)
             Align(
@@ -887,6 +786,7 @@ class _HomeState extends State<Home> {
               itemBuilder: (context, index) {
                 final itemDescrip = datosDescription[index];
                 final itemGroup = datosGroup[index];
+
                 return ListTile(
                   title: Text(itemDescrip),
                   subtitle: Text(itemGroup), // Aquí puedes poner el grupo
@@ -906,10 +806,11 @@ class _HomeState extends State<Home> {
                           'longitude': '0',
                         },
                       );
-                      final position = LatLng(
+                      position = LatLng(
                         double.parse(data['latitude'].toString()),
                         double.parse(data['longitude'].toString()),
                       );
+
                       // Aquí puedes hacer lo que necesites con las coordenadas
                       dosPuntos = true;
                       miUbicacion = false;
@@ -929,7 +830,7 @@ class _HomeState extends State<Home> {
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('No hay marcadores'),
+                          content: Text('No se ha definido el punto inicial'),
                         ),
                       );
                     }
@@ -941,5 +842,71 @@ class _HomeState extends State<Home> {
         );
       },
     );
+  }
+
+  Future<dynamic> modalMarcaInicio(BuildContext context) {
+    return showModalBottomSheet(
+        context: context,
+        builder: (BuildContext context) {
+          return Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+            ),
+            height: 140,
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: ElevatedButton(
+                      onPressed: () {
+                        mostrarMarcador = false;
+                        setState(() {});
+                        Navigator.of(context).pop();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: Colors.black,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        minimumSize: const Size(double.infinity, 50),
+                      ),
+                      child: const Text('Marcar en el mapa'),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: ElevatedButton(
+                        onPressed: () {
+                          inicioLatitude = currentLocation!.latitude!;
+                          inicioLongitude = currentLocation!
+                              .longitude!; //currentLocation!.longitude!;
+                          mostrarMarcador = true;
+                          miUbicacion = true;
+                          bandera = false;
+                          addMarker(LatLng(
+                            currentLocation!.latitude!,
+                            currentLocation!.longitude!,
+                          ));
+                          finMarker = true;
+                          Navigator.of(context).pop();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: Colors.black,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          minimumSize: const Size(double.infinity, 50),
+                        ),
+                        child: const Text("Desde mi ubicación")),
+                  ),
+                ],
+              ),
+            ),
+          );
+        });
   }
 }
