@@ -32,7 +32,7 @@ class _LocationInfoState extends State<LocationInfo> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
         ),
-        color: widget.isSelected ? Colors.blue : Colors.white,
+        color: widget.isSelected ? Colors.blueGrey[300] : Colors.white,
         child: InkWell(
           onTap: widget.onPressed,
           child: Padding(

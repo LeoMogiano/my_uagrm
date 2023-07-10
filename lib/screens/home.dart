@@ -479,6 +479,7 @@ class _HomeState extends State<Home> {
                 mapType: MapType.normal,
                 compassEnabled: false,
                 markers: markers,
+                myLocationEnabled: true,
                 onCameraMove: (CameraPosition? position) {
                   /* if (kDebugMode) {
                     print("Camera Move");
