@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math';
 
 import 'package:material_floating_search_bar_2/material_floating_search_bar_2.dart';
 import 'package:location/location.dart';
@@ -13,10 +12,14 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:sig_grupL/widgets/widgets.dart';
+import 'package:provider/provider.dart';
 
-import '../controllers/api_controller.dart';
+/* import 'package:sig_grupL/controllers/api_controller.dart'; */
+import 'package:sig_grupL/controllers/functions_map.dart';
+import 'package:sig_grupL/models/ubicaciones.dart';
+import 'package:sig_grupL/services/ubi_services.dart';
 import 'package:sig_grupL/utils/utils.dart';
+import 'package:sig_grupL/widgets/widgets.dart';
 
 class Home extends StatefulWidget {
   const Home({Key? key}) : super(key: key);
@@ -58,10 +61,22 @@ class _HomeState extends State<Home> {
   Set<Polyline> walkingPolylines = {};
 
   List<Map<String, Object>> jsonData = [];
-  List<String> datosDescription = [];
-  List<String> datosGroup = [];
-
+  List<String?> datosDescription = [];
+  List<String?> datosGroup = [];
+  late UbiService ubiService;
   final TextEditingController _searchController = TextEditingController();
+
+  String? getGroupForItem(String item) {
+    final ubicacion = ubiService.ubicaciones.firstWhere(
+      (element) => element.description == item,
+      orElse: () => Ubicaciones(
+        description: '',
+        group: '',
+      ),
+    );
+
+    return ubicacion.group;
+  }
 
   Future<GoogleMapController> get _mapController async {
     return await _completer.future;
@@ -203,9 +218,12 @@ class _HomeState extends State<Home> {
       if (!areCalculationsDone) {
         // Realiza los cálculos solo si no se han realizado antes
         // Calcula la distancia nuevamente
-        calculatePolylineDistance(polylineCoordinates);
-        calculateTime();
-        calculatePolylineDistance(polylineCoordinates);
+        totalDistance = calculatePolylineDistance(polylineCoordinates);
+        Map<String, String> tiempos = calculateTime(totalDistance);
+
+        tiempoAuto = tiempos['tiempoAuto']!;
+        tiempoCaminando = tiempos['tiempoCaminando']!;
+        /* calculatePolylineDistance(polylineCoordinates); */
 
         // Actualiza el control de estado
         areCalculationsDone = true;
@@ -243,106 +261,6 @@ class _HomeState extends State<Home> {
     setState(() {});
   }
 
-  LatLngBounds boundsFromLatLngList(List<LatLng> list) {
-    double? minLat, maxLat, minLng, maxLng;
-
-    for (final latLng in list) {
-      if (minLat == null || latLng.latitude < minLat) {
-        minLat = latLng.latitude;
-      }
-      if (maxLat == null || latLng.latitude > maxLat) {
-        maxLat = latLng.latitude;
-      }
-      if (minLng == null || latLng.longitude < minLng) {
-        minLng = latLng.longitude;
-      }
-      if (maxLng == null || latLng.longitude > maxLng) {
-        maxLng = latLng.longitude;
-      }
-    }
-
-    return LatLngBounds(
-      northeast: LatLng(maxLat!, maxLng!),
-      southwest: LatLng(minLat!, minLng!),
-    );
-  }
-
-  void calculatePolylineDistance(List<LatLng> polylineCoordinates) {
-    totalDistance = 0.0;
-
-    for (int i = 0; i < polylineCoordinates.length - 1; i++) {
-      final LatLng start = polylineCoordinates[i];
-      final LatLng end = polylineCoordinates[i + 1];
-
-      final double segmentDistance = calculateDistance(start, end);
-      totalDistance += segmentDistance;
-    }
-
-    totalDistance = double.parse(totalDistance.toStringAsFixed(2));
-
-    if (kDebugMode) {
-      print('Distancia total de la polilínea: $totalDistance km');
-    }
-  }
-
-  double calculateDistance(LatLng start, LatLng end) {
-    const int earthRadius = 6371; // Radio de la Tierra en kilómetros
-
-    final double lat1 = start.latitude * pi / 180;
-    final double lon1 = start.longitude * pi / 180;
-    final double lat2 = end.latitude * pi / 180;
-    final double lon2 = end.longitude * pi / 180;
-
-    final double dLat = lat2 - lat1;
-    final double dLon = lon2 - lon1;
-
-    final double a =
-        pow(sin(dLat / 2), 2) + cos(lat1) * cos(lat2) * pow(sin(dLon / 2), 2);
-    final double c = 2 * atan2(sqrt(a), sqrt(1 - a));
-
-    final double distance = earthRadius * c;
-    return distance;
-  }
-
-  String formatTime(double time) {
-    int hours = (time / 60).floor();
-    int minutes = (time % 60).round();
-
-    String formattedTime;
-
-    if (hours > 0) {
-      formattedTime = '$hours hr $minutes min';
-    } else {
-      formattedTime = '$minutes min';
-    }
-
-    return formattedTime;
-  }
-
-  void calculateTime() {
-    // Velocidad promedio a pie en km/h
-    const double walkingSpeed = 5.0;
-
-    // Velocidad promedio en automóvil en km/h
-    const double carSpeed = 60.0;
-
-    // Calcula el tiempo estimado en minutos
-    double walkingTime = (totalDistance / walkingSpeed) * 60;
-    double carTime = (totalDistance / carSpeed) * 60;
-
-    // Convierte el tiempo a formato horas:minutos
-    String walkingTimeFormatted = formatTime(walkingTime);
-    String carTimeFormatted = formatTime(carTime);
-
-    if (kDebugMode) {
-      print('Tiempo estimado a pie: $walkingTimeFormatted');
-      print('Tiempo estimado en automóvil: $carTimeFormatted');
-    }
-
-    tiempoAuto = carTimeFormatted;
-    tiempoCaminando = walkingTimeFormatted;
-  }
-
   void removeMarker(MarkerId markerId) {
     setState(() {
       markers.removeWhere((marker) => marker.markerId == markerId);
@@ -355,44 +273,34 @@ class _HomeState extends State<Home> {
   }
 
   void search(String query) {
-    final matchQuery = getMatchedResults(query);
-    final matchQueryGroup = getMatchedResultsGroup(query);
+    final combinedResults = getCombinedResults(query);
+
     setState(() {
-      datosDescription = matchQuery;
-      datosGroup = matchQueryGroup;
-      if (kDebugMode) {
-        print(datosDescription);
-      }
-      if (kDebugMode) {
-        print(datosGroup);
-      }
+      datosDescription = combinedResults;
+      /* datosGroup = []; */
     });
   }
 
-  List<String> getMatchedResults(String query) {
+  List<String?> getCombinedResults(String query) {
     if (query.isEmpty) {
       return [];
     }
 
-    return jsonData
-        .map((item) => item['description'] as String)
-        .where((item) => item.toLowerCase().contains(query.toLowerCase()))
-        .toList();
-  }
+    final searchQuery = query.toLowerCase();
 
-  List<String> getMatchedResultsGroup(String query) {
-    if (query.isEmpty) {
-      return [];
-    }
-
-    List<String> group = [];
-    for (var i = 0; i < jsonData.length; i++) {
-      String description = jsonData[i]['description'] as String;
-      if (description.toLowerCase().contains(query.toLowerCase())) {
-        group.add(jsonData[i]['group'] as String);
+    return ubiService.ubicaciones
+        .where((ubicacion) =>
+            (ubicacion.description != null &&
+                ubicacion.description!.toLowerCase().contains(searchQuery)) ||
+            (ubicacion.group != null &&
+                ubicacion.group!.toLowerCase().contains(searchQuery)))
+        .map((ubicacion) {
+      if (ubicacion.description != null) {
+        return ubicacion.description;
+      } else {
+        return ubicacion.group;
       }
-    }
-    return group;
+    }).toList();
   }
 
   getAddressFromLatLng() async {
@@ -402,8 +310,8 @@ class _HomeState extends State<Home> {
         setState(() {});
       } else {
         GeoData dataGeo = await Geocoder2.getDataFromCoordinates(
-            latitude: iniLocation!.latitude,
-            longitude: iniLocation!.longitude,
+            latitude: iniLocation?.latitude ?? -17.783299,
+            longitude: iniLocation?.longitude ?? -63.182129,
             googleMapApiKey: apiGoogle);
         setState(() {
           isLoading = false;
@@ -424,22 +332,15 @@ class _HomeState extends State<Home> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    ubiService = Provider.of<UbiService>(context, listen: true);
+  }
+
+  @override
   void initState() {
     _init();
     getCurrentLocation();
-    ApiController().leerJSON().then((data) {
-      setState(() {
-        jsonData = data;
-        datosDescription =
-            jsonData.map((item) => item['description'] as String).toList();
-        datosGroup = jsonData.map((item) => item['group'] as String).toList();
-      });
-    }).catchError((error) {
-      // Manejar el error de lectura del JSON
-      if (kDebugMode) {
-        print("Error: $error");
-      }
-    });
     super.initState();
   }
 
@@ -452,6 +353,14 @@ class _HomeState extends State<Home> {
 
   @override
   Widget build(BuildContext context) {
+    if (ubiService.isLoading) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
     return Scaffold(
       body: Stack(
         children: [
@@ -656,38 +565,32 @@ class _HomeState extends State<Home> {
               ),
             ),
           if (finMarker == true)
-            Container(
-              margin: const EdgeInsets.only(top: 100, right: 10),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  FloatingActionButton(
-                    heroTag: 'add_location',
-                    backgroundColor: Colors.red,
-                    onPressed: () {
-                      _completer.future.then((GoogleMapController controller) {
-                        controller
-                            .getVisibleRegion()
-                            .then((LatLngBounds bounds) {
-                          if (dosPuntos == false) {
-                            miUbicacion = false;
-                            finMarker = false;
-                            dosPuntos = false;
-                            removeMarker(markers.first.markerId);
-                          } else {
-                            removeMarker(markers.first.markerId);
-                            removeMarker(markers.last.markerId);
-                            mostrarMarcador = true;
-                            dosPuntos = false;
-                            finMarker = false;
-                          }
-                        });
-                      });
-                    },
-                    child: const Icon(Icons.delete, color: Colors.white),
-                  ),
-                ],
+            Positioned(
+              top: 150,
+              right: 10,
+              child: FloatingActionButton(
+                heroTag: 'add_location',
+                backgroundColor: Colors.red,
+                onPressed: () {
+                  _completer.future.then((GoogleMapController controller) {
+                    controller.getVisibleRegion().then((LatLngBounds bounds) {
+                      if (dosPuntos == false) {
+                        miUbicacion = false;
+                        finMarker = false;
+                        dosPuntos = false;
+                        removeMarker(markers.first.markerId);
+                      } else {
+                        removeMarker(markers.first.markerId);
+                        removeMarker(markers.last.markerId);
+                        mostrarMarcador = true;
+                        dosPuntos = false;
+                        finMarker = false;
+                      }
+                    });
+                  });
+                },
+                mini: true,
+                child: const Icon(Icons.delete, color: Colors.white),
               ),
             ),
           if (mostrarMarcador == false)
@@ -732,6 +635,55 @@ class _HomeState extends State<Home> {
                 ),
               ),
             ),
+          Positioned(
+            top: 100,
+            right: 10,
+            child: FloatingActionButton(
+              heroTag: 'my_location',
+              onPressed: () async {
+                GoogleMapController controller = await _mapController;
+                ubicacionActual(controller);
+              },
+              backgroundColor: Colors.white,
+              foregroundColor: Colors.grey[800],
+              mini: true,
+              child: const Icon(Icons.my_location),
+            ),
+          ),
+          Positioned(
+            top: 100,
+            left: 10,
+            child: FloatingActionButton(
+              heroTag: 'zoom_in',
+              onPressed: () async {
+                GoogleMapController controller = await _mapController;
+                setState(() {
+                  changeZoom(controller, true);
+                });
+              },
+              backgroundColor: Colors.white,
+              foregroundColor: Colors.grey[800],
+              mini: true, // Ajustar tamaño a pequeño
+              child: const Icon(Icons.add),
+            ),
+          ),
+          Positioned(
+            top: 150,
+            left: 10,
+            child: FloatingActionButton(
+              heroTag: 'zoom_out',
+              onPressed: () async {
+                GoogleMapController controller = await _mapController;
+                setState(() {
+                  changeZoom(controller, false);
+                });
+              },
+              backgroundColor: Colors.white,
+              foregroundColor: Colors.grey[800],
+              mini: true, // Ajustar tamaño a pequeño
+              child: const Icon(Icons.remove),
+            ),
+          ),
           buildFloatingSearchBar(context),
         ],
       ),
@@ -758,7 +710,6 @@ class _HomeState extends State<Home> {
       debounceDelay: const Duration(milliseconds: 400),
       borderRadius: BorderRadius.circular(30),
       onQueryChanged: (query) {
-        // Call your model, bloc, controller here.
         search(query);
       },
       transition: CircularFloatingSearchBarTransition(),
@@ -781,50 +732,46 @@ class _HomeState extends State<Home> {
             color: Colors.white,
             elevation: 4.0,
             child: ListView.builder(
-              shrinkWrap: true, // Ajusta el tamaño al contenido
+              shrinkWrap: true,
               itemCount: datosDescription.length,
               padding: EdgeInsets.zero,
               itemBuilder: (context, index) {
-                final itemDescrip = datosDescription[index];
-                final itemGroup = datosGroup[index];
+                final item = datosDescription[index];
+                final groupValue = getGroupForItem(item!);
 
                 return ListTile(
-                  title: Text(itemDescrip),
-                  subtitle: Text(itemGroup), // Aquí puedes poner el grupo
+                  title: Text(item),
+                  subtitle: groupValue != null ? Text(groupValue) : null,
                   iconColor: Colors.blue,
                   dense: true,
-                  /* icon ojo */
-                  leading: const Icon(
-                    Icons.location_on,
-                  ),
+                  leading: const Icon(Icons.location_on),
                   onTap: () {
                     if (markers.isNotEmpty) {
-                      final data = jsonData.firstWhere(
-                        (element) => element['description'] == itemDescrip,
-                        orElse: () => {
-                          'description': '',
-                          'latitude': '0',
-                          'longitude': '0',
-                        },
-                      );
-                      position = LatLng(
-                        double.parse(data['latitude'].toString()),
-                        double.parse(data['longitude'].toString()),
+                      final data = ubiService.ubicaciones.firstWhere(
+                        (element) => element.description == item,
+                        orElse: () => Ubicaciones(
+                          description: '',
+                          latitude: '0',
+                          longitude: '0',
+                        ),
                       );
 
-                      // Aquí puedes hacer lo que necesites con las coordenadas
+                      position = LatLng(
+                        double.parse(data.latitude!),
+                        double.parse(data.longitude!),
+                      );
+
                       dosPuntos = true;
                       miUbicacion = false;
-                      description = data['description'].toString();
-                      group = data['group'].toString();
-                      initials = data['initials'].toString();
-                      // Por ejemplo, agregar un marcador
+                      description = data.description!;
+                      group = data.group!;
+                      initials = data.initials!;
+
                       addMarker(position);
-                      // Cerrar el buscador y volver a la pantalla principal
+
                       setState(() {
                         search('');
                         _searchController.clear();
-                        /* Ocultar teclado */
                         FocusScope.of(context).unfocus();
                       });
                       _searchBarKey.currentState?.close();

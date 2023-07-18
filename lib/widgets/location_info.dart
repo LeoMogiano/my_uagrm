@@ -17,10 +17,10 @@ class LocationInfo extends StatefulWidget {
   final VoidCallback onPressed;
 
   @override
-  _LocationInfoState createState() => _LocationInfoState();
+  LocationInfoState createState() => LocationInfoState();
 }
 
-class _LocationInfoState extends State<LocationInfo> {
+class LocationInfoState extends State<LocationInfo> {
   @override
   Widget build(BuildContext context) {
     return Expanded(
