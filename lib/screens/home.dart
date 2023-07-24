@@ -11,6 +11,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
+import 'package:speech_to_text/speech_to_text.dart';
+import 'package:permission_handler/permission_handler.dart';
+
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
 
@@ -29,6 +32,10 @@ class Home extends StatefulWidget {
 }
 
 class _HomeState extends State<Home> {
+  bool isListening = false;
+  SpeechToText speechToText = SpeechToText();
+  bool speechEnabled = false;
+  final String selectedLocaleId = 'es_MX';
   final String apiGoogle = dotenv.env['API_GOOGLE'] ?? '';
   final Completer<GoogleMapController> _completer = Completer();
   LocationData? currentLocation;
@@ -65,6 +72,54 @@ class _HomeState extends State<Home> {
   List<String?> datosGroup = [];
   late UbiService ubiService;
   final TextEditingController _searchController = TextEditingController();
+  final FloatingSearchBarController _searchBarController =
+      FloatingSearchBarController();
+
+ void startListening() async {
+  var status = await Permission.microphone.status;
+  if (status.isDenied || status.isPermanentlyDenied) {
+    var result = await Permission.microphone.request();
+    if (result.isDenied || result.isPermanentlyDenied) {
+      // El usuario ha denegado el permiso o ha seleccionado "No volver a preguntar". Maneja este caso según tus necesidades.
+      return;
+    }
+  }
+  speechEnabled = await speechToText.initialize();
+
+  setState(() {
+    isListening = true;
+  });
+
+  debugPrint('Inicio del reconocimiento de voz');
+
+  speechToText.listen(
+    onResult: (result) {
+      setState(() {
+        _searchBarController.query = result.recognizedWords;
+        _searchBarController.open();
+        search(result.recognizedWords);
+      });
+
+      // Comprobar si se ha detectado un comando para detener el reconocimiento de voz
+      if (result.finalResult) {
+        stopListening();
+      }
+    },
+    localeId: selectedLocaleId,
+    cancelOnError: false,
+  );
+}
+
+void stopListening() {
+  setState(() {
+    isListening = false;
+  });
+
+  debugPrint('Fin del reconocimiento de voz');
+
+  speechToText.stop();
+}
+
 
   String? getGroupForItem(String item) {
     final ubicacion = ubiService.ubicaciones.firstWhere(
@@ -272,36 +327,53 @@ class _HomeState extends State<Home> {
     });
   }
 
-  void search(String query) {
-    final combinedResults = getCombinedResults(query);
+void search(String query) {
+  final combinedResults = getCombinedResults(query);
 
-    setState(() {
-      datosDescription = combinedResults;
-      /* datosGroup = []; */
-    });
+  setState(() {
+    datosDescription = combinedResults;
+  });
+}
+
+List<String?> getCombinedResults(String query) {
+  if (query.isEmpty) {
+    return [];
   }
 
-  List<String?> getCombinedResults(String query) {
-    if (query.isEmpty) {
-      return [];
+  final searchQuery = removeAccents(query.toLowerCase());
+
+  return ubiService.ubicaciones
+      .where((ubicacion) =>
+          (ubicacion.description != null &&
+              removeAccents(ubicacion.description!.toLowerCase())
+                  .contains(searchQuery)) ||
+          (ubicacion.group != null &&
+              removeAccents(ubicacion.group!.toLowerCase())
+                  .contains(searchQuery)))
+      .map((ubicacion) {
+    if (ubicacion.description != null) {
+      return ubicacion.description;
+    } else {
+      return ubicacion.group;
     }
+  }).toList();
+}
 
-    final searchQuery = query.toLowerCase();
+String removeAccents(String input) {
+  final accentsMap = {
+    'á': 'a',
+    'é': 'e',
+    'í': 'i',
+    'ó': 'o',
+    'ú': 'u',
+    'ü': 'u',
+    'ñ': 'n',
+  };
 
-    return ubiService.ubicaciones
-        .where((ubicacion) =>
-            (ubicacion.description != null &&
-                ubicacion.description!.toLowerCase().contains(searchQuery)) ||
-            (ubicacion.group != null &&
-                ubicacion.group!.toLowerCase().contains(searchQuery)))
-        .map((ubicacion) {
-      if (ubicacion.description != null) {
-        return ubicacion.description;
-      } else {
-        return ubicacion.group;
-      }
-    }).toList();
-  }
+  return input.replaceAllMapped(RegExp(r'[áéíóúüñ]'), (match) => accentsMap[match.group(0)]!);
+}
+
+
 
   getAddressFromLatLng() async {
     try {
@@ -331,6 +403,8 @@ class _HomeState extends State<Home> {
     }
   }
 
+  /// This has to happen only once per app
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -341,6 +415,7 @@ class _HomeState extends State<Home> {
   void initState() {
     _init();
     getCurrentLocation();
+
     super.initState();
   }
 
@@ -699,6 +774,7 @@ class _HomeState extends State<Home> {
 
     return FloatingSearchBar(
       key: _searchBarKey,
+      controller: _searchBarController,
       hint: 'Buscar lugar',
       scrollPadding: const EdgeInsets.only(top: 16, bottom: 56),
       transitionDuration: const Duration(milliseconds: 500),
@@ -714,15 +790,28 @@ class _HomeState extends State<Home> {
       },
       transition: CircularFloatingSearchBarTransition(),
       actions: [
-        FloatingSearchBarAction(
+        /* FloatingSearchBarAction(
           showIfOpened: false,
           child: CircularButton(
             icon: const Icon(Icons.place),
             onPressed: () {},
           ),
-        ),
+        ), */
         FloatingSearchBarAction.searchToClear(
           showIfClosed: false,
+        ),
+        FloatingSearchBarAction(
+          showIfClosed: true,
+          showIfOpened: true,
+          child: isListening
+              ? CircularButton(
+                  icon: const Icon(Icons.stop),
+                  onPressed: stopListening,
+                )
+              : CircularButton(
+                  icon: const Icon(Icons.mic),
+                  onPressed: startListening,
+                ),
         ),
       ],
       builder: (context, transition) {
