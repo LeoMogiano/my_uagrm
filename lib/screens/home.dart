@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
+import 'package:sig_grupL/models/autocomplate_prediction.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -23,6 +24,8 @@ import 'package:sig_grupL/models/ubicaciones.dart';
 import 'package:sig_grupL/services/ubi_services.dart';
 import 'package:sig_grupL/utils/utils.dart';
 import 'package:sig_grupL/widgets/widgets.dart';
+
+import 'package:http/http.dart' as http;
 
 class Home extends StatefulWidget {
   const Home({Key? key}) : super(key: key);
@@ -70,56 +73,56 @@ class _HomeState extends State<Home> {
   List<Map<String, Object>> jsonData = [];
   List<String?> datosDescription = [];
   List<String?> datosGroup = [];
+  List<AutocompletePrediction> placePredictionList = [];
   late UbiService ubiService;
   final TextEditingController _searchController = TextEditingController();
   final FloatingSearchBarController _searchBarController =
       FloatingSearchBarController();
 
- void startListening() async {
-  var status = await Permission.microphone.status;
-  if (status.isDenied || status.isPermanentlyDenied) {
-    var result = await Permission.microphone.request();
-    if (result.isDenied || result.isPermanentlyDenied) {
-      // El usuario ha denegado el permiso o ha seleccionado "No volver a preguntar". Maneja este caso según tus necesidades.
-      return;
-    }
-  }
-  speechEnabled = await speechToText.initialize();
-
-  setState(() {
-    isListening = true;
-  });
-
-  debugPrint('Inicio del reconocimiento de voz');
-
-  speechToText.listen(
-    onResult: (result) {
-      setState(() {
-        _searchBarController.query = result.recognizedWords;
-        _searchBarController.open();
-        search(result.recognizedWords);
-      });
-
-      // Comprobar si se ha detectado un comando para detener el reconocimiento de voz
-      if (result.finalResult) {
-        stopListening();
+  void startListening() async {
+    var status = await Permission.microphone.status;
+    if (status.isDenied || status.isPermanentlyDenied) {
+      var result = await Permission.microphone.request();
+      if (result.isDenied || result.isPermanentlyDenied) {
+        // El usuario ha denegado el permiso o ha seleccionado "No volver a preguntar". Maneja este caso según tus necesidades.
+        return;
       }
-    },
-    localeId: selectedLocaleId,
-    cancelOnError: false,
-  );
-}
+    }
+    speechEnabled = await speechToText.initialize();
 
-void stopListening() {
-  setState(() {
-    isListening = false;
-  });
+    setState(() {
+      isListening = true;
+    });
 
-  debugPrint('Fin del reconocimiento de voz');
+    debugPrint('Inicio del reconocimiento de voz');
 
-  speechToText.stop();
-}
+    speechToText.listen(
+      onResult: (result) {
+        setState(() {
+          _searchBarController.query = result.recognizedWords;
+          _searchBarController.open();
+          search(result.recognizedWords);
+        });
 
+        // Comprobar si se ha detectado un comando para detener el reconocimiento de voz
+        if (result.finalResult) {
+          stopListening();
+        }
+      },
+      localeId: selectedLocaleId,
+      cancelOnError: false,
+    );
+  }
+
+  void stopListening() {
+    setState(() {
+      isListening = false;
+    });
+
+    debugPrint('Fin del reconocimiento de voz');
+
+    speechToText.stop();
+  }
 
   String? getGroupForItem(String item) {
     final ubicacion = ubiService.ubicaciones.firstWhere(
@@ -327,53 +330,122 @@ void stopListening() {
     });
   }
 
-void search(String query) {
-  final combinedResults = getCombinedResults(query);
+  Future<void> search(String query) async {
+    if (miUbicacion) {
+      Uri uri = Uri.https(
+          "maps.googleapis.com", "/maps/api/place/autocomplete/json", {
+        "input": query,
+        "key": apiGoogle,
+        "language": "es",
+      });
+      /* print(uri); */
 
-  setState(() {
-    datosDescription = combinedResults;
-  });
-}
+      // Realizar la solicitud a la API de Place Autocomplete
+      var response = await http.get(uri);
+      if (response.statusCode == 200) {
+        // Decodificar la respuesta JSON
+        var data = json.decode(response.body);
 
-List<String?> getCombinedResults(String query) {
-  if (query.isEmpty) {
-    return [];
+        // Verificar si hay resultados
+        if (data['status'] == 'OK' && data['predictions'].length > 0) {
+          // Obtener el lugar sugerido (el primer resultado)
+
+          setState(() {
+            placePredictionList = (data['predictions'] as List)
+                .map((item) => AutocompletePrediction.fromJson(item))
+                .toList();
+          });
+
+          /* print(placePredictionList.length); */
+          /* var place = data['predictions'][0];
+
+          // Obtener el ID del lugar
+          String placeId = place['place_id'];
+
+          // Utilizar el ID del lugar para obtener detalles de geocoding
+          Uri geocodingUri =
+              Uri.https("maps.googleapis.com", "/maps/api/geocode/json", {
+            "place_id": placeId,
+            "key": apiGoogle,
+          });
+
+          // Realizar la solicitud a la API de Geocoding
+          var geocodingResponse = await http.get(geocodingUri);
+          if (geocodingResponse.statusCode == 200) {
+            // Decodificar la respuesta JSON de Geocoding
+            var geocodingData = json.decode(geocodingResponse.body);
+
+            // Verificar si hay resultados
+            if (geocodingData['status'] == 'OK' &&
+                geocodingData['results'].length > 0) {
+              // Obtener la ubicación geográfica (latitud y longitud) del lugar
+              var location =
+                  geocodingData['results'][0]['geometry']['location'];
+              double latitude = location['lat'];
+              double longitude = location['lng'];
+
+              // Hacer lo que desees con la latitud y longitud obtenidas
+              print("Latitud: $latitude");
+              print("Longitud: $longitude");
+            } else {
+              print("No se encontraron resultados de geocoding para el lugar.");
+            }
+          } else {
+            print("Error al obtener datos de geocoding.");
+          } */
+        } else {
+          print(
+              "No se encontraron resultados de Place Autocomplete para la consulta.");
+        }
+      } else {
+        print("Error al obtener datos de Place Autocomplete.");
+      }
+    } else {
+      final combinedResults = getCombinedResults(query);
+      setState(() {
+        datosDescription = combinedResults;
+      });
+    }
   }
 
-  final searchQuery = removeAccents(query.toLowerCase());
-
-  return ubiService.ubicaciones
-      .where((ubicacion) =>
-          (ubicacion.description != null &&
-              removeAccents(ubicacion.description!.toLowerCase())
-                  .contains(searchQuery)) ||
-          (ubicacion.group != null &&
-              removeAccents(ubicacion.group!.toLowerCase())
-                  .contains(searchQuery)))
-      .map((ubicacion) {
-    if (ubicacion.description != null) {
-      return ubicacion.description;
-    } else {
-      return ubicacion.group;
+  List<String?> getCombinedResults(String query) {
+    if (query.isEmpty) {
+      return [];
     }
-  }).toList();
-}
 
-String removeAccents(String input) {
-  final accentsMap = {
-    'á': 'a',
-    'é': 'e',
-    'í': 'i',
-    'ó': 'o',
-    'ú': 'u',
-    'ü': 'u',
-    'ñ': 'n',
-  };
+    final searchQuery = removeAccents(query.toLowerCase());
 
-  return input.replaceAllMapped(RegExp(r'[áéíóúüñ]'), (match) => accentsMap[match.group(0)]!);
-}
+    return ubiService.ubicaciones
+        .where((ubicacion) =>
+            (ubicacion.description != null &&
+                removeAccents(ubicacion.description!.toLowerCase())
+                    .contains(searchQuery)) ||
+            (ubicacion.group != null &&
+                removeAccents(ubicacion.group!.toLowerCase())
+                    .contains(searchQuery)))
+        .map((ubicacion) {
+      if (ubicacion.description != null) {
+        return ubicacion.description;
+      } else {
+        return ubicacion.group;
+      }
+    }).toList();
+  }
 
+  String removeAccents(String input) {
+    final accentsMap = {
+      'á': 'a',
+      'é': 'e',
+      'í': 'i',
+      'ó': 'o',
+      'ú': 'u',
+      'ü': 'u',
+      'ñ': 'n',
+    };
 
+    return input.replaceAllMapped(
+        RegExp(r'[áéíóúüñ]'), (match) => accentsMap[match.group(0)]!);
+  }
 
   getAddressFromLatLng() async {
     try {
@@ -560,7 +632,9 @@ String removeAccents(String input) {
                 ],
               ),
             ),
-          if (finMarker == false && mostrarMarcador == true)
+          if (finMarker == false &&
+              mostrarMarcador == true &&
+              miUbicacion == false)
             PanelMarcaInicio(
               onPressed: () {
                 modalMarcaInicio(context);
@@ -639,6 +713,44 @@ String removeAccents(String input) {
                 ),
               ),
             ),
+          /* Cancelar */
+          if (miUbicacion)
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: Container(
+                width: double.infinity,
+                height: 75,
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(30),
+                      topRight: Radius.circular(30)),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.only(
+                      left: 25, right: 25, top: 10, bottom: 10),
+                  child: Column(
+                    children: [
+                      /* Cancelar */
+                      ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            minimumSize: const Size(double.infinity, 50),
+                          ),
+                          child: const Text('Cancelar'),
+                          onPressed: () {
+                            miUbicacion = false;
+                            setState(() {});
+                          }),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           if (finMarker == true)
             Positioned(
               top: 150,
@@ -665,7 +777,7 @@ String removeAccents(String input) {
                   });
                 },
                 mini: true,
-                child: const Icon(Icons.delete, color: Colors.white),
+                child: const Icon(Icons.clear, color: Colors.white),
               ),
             ),
           if (mostrarMarcador == false)
@@ -759,7 +871,8 @@ String removeAccents(String input) {
               child: const Icon(Icons.remove),
             ),
           ),
-          buildFloatingSearchBar(context),
+          if (mostrarMarcador == true && dosPuntos == false)
+            buildFloatingSearchBar(context),
         ],
       ),
     );
@@ -815,68 +928,144 @@ String removeAccents(String input) {
         ),
       ],
       builder: (context, transition) {
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: Material(
-            color: Colors.white,
-            elevation: 4.0,
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: datosDescription.length,
-              padding: EdgeInsets.zero,
-              itemBuilder: (context, index) {
-                final item = datosDescription[index];
-                final groupValue = getGroupForItem(item!);
+        return miUbicacion
+            ? ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Material(
+                  color: Colors.white,
+                  elevation: 4.0,
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: placePredictionList.length,
+                    padding: EdgeInsets.zero,
+                    itemBuilder: (context, index) {
+                      final item = placePredictionList[index];
+                      return ListTile(
+                        title: Text((item.description).toString()),
+                        subtitle: Text(item.structuredFormatting!.secondaryText
+                            .toString()),
+                        iconColor: Colors.blue,
+                        dense: true,
+                        leading: const Icon(Icons.location_on),
+                        onTap: () async {
+                          String placeId = item.placeId!;
 
-                return ListTile(
-                  title: Text(item),
-                  subtitle: groupValue != null ? Text(groupValue) : null,
-                  iconColor: Colors.blue,
-                  dense: true,
-                  leading: const Icon(Icons.location_on),
-                  onTap: () {
-                    if (markers.isNotEmpty) {
-                      final data = ubiService.ubicaciones.firstWhere(
-                        (element) => element.description == item,
-                        orElse: () => Ubicaciones(
-                          description: '',
-                          latitude: '0',
-                          longitude: '0',
-                        ),
+                          // Utilizar el ID del lugar para obtener detalles de geocoding
+                          Uri geocodingUri = Uri.https(
+                              "maps.googleapis.com", "/maps/api/geocode/json", {
+                            "place_id": placeId,
+                            "key": apiGoogle,
+                          });
+
+                          // Realizar la solicitud a la API de Geocoding
+                          var geocodingResponse = await http.get(geocodingUri);
+                          if (geocodingResponse.statusCode == 200) {
+                            // Decodificar la respuesta JSON de Geocoding
+                            var geocodingData =
+                                json.decode(geocodingResponse.body);
+
+                            // Verificar si hay resultados
+                            if (geocodingData['status'] == 'OK' &&
+                                geocodingData['results'].length > 0) {
+                              // Obtener la ubicación geográfica (latitud y longitud) del lugar
+                              var location = geocodingData['results'][0]
+                                  ['geometry']['location'];
+                              double latitude = location['lat'];
+                              double longitude = location['lng'];
+
+                              // Hacer lo que desees con la latitud y longitud obtenidas
+                              print("Latitud: $latitude");
+                              print("Longitud: $longitude");
+
+                              inicioLatitude = latitude;
+                              inicioLongitude = longitude;
+                              mostrarMarcador = true;
+                              miUbicacion = false;
+                              bandera = false;
+                              addMarker(LatLng(latitude, longitude));
+                              finMarker = true;
+                              setState(() {
+                                search('');
+                                _searchController.clear();
+                                FocusScope.of(context).unfocus();
+                              });
+                              _searchBarKey.currentState?.close();
+                            } else {
+                              print(
+                                  "No se encontraron resultados de geocoding para el lugar.");
+                            }
+                          } else {
+                            print("Error al obtener datos de geocoding.");
+                          }
+                        },
                       );
+                    },
+                  ),
+                ),
+              )
+            : ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Material(
+                  color: Colors.white,
+                  elevation: 4.0,
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: datosDescription.length,
+                    padding: EdgeInsets.zero,
+                    itemBuilder: (context, index) {
+                      final item = datosDescription[index];
+                      final groupValue = getGroupForItem(item!);
 
-                      position = LatLng(
-                        double.parse(data.latitude!),
-                        double.parse(data.longitude!),
+                      return ListTile(
+                        title: Text(item),
+                        subtitle: groupValue != null ? Text(groupValue) : null,
+                        iconColor: Colors.blue,
+                        dense: true,
+                        leading: const Icon(Icons.location_on),
+                        onTap: () {
+                          if (markers.isNotEmpty) {
+                            final data = ubiService.ubicaciones.firstWhere(
+                              (element) => element.description == item,
+                              orElse: () => Ubicaciones(
+                                description: '',
+                                latitude: '0',
+                                longitude: '0',
+                              ),
+                            );
+
+                            position = LatLng(
+                              double.parse(data.latitude!),
+                              double.parse(data.longitude!),
+                            );
+
+                            dosPuntos = true;
+                            miUbicacion = false;
+                            description = data.description!;
+                            group = data.group!;
+                            initials = data.initials!;
+
+                            addMarker(position);
+
+                            setState(() {
+                              search('');
+                              _searchController.clear();
+                              FocusScope.of(context).unfocus();
+                            });
+                            _searchBarKey.currentState?.close();
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content:
+                                    Text('No se ha definido el punto inicial'),
+                              ),
+                            );
+                          }
+                        },
                       );
-
-                      dosPuntos = true;
-                      miUbicacion = false;
-                      description = data.description!;
-                      group = data.group!;
-                      initials = data.initials!;
-
-                      addMarker(position);
-
-                      setState(() {
-                        search('');
-                        _searchController.clear();
-                        FocusScope.of(context).unfocus();
-                      });
-                      _searchBarKey.currentState?.close();
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('No se ha definido el punto inicial'),
-                        ),
-                      );
-                    }
-                  },
-                );
-              },
-            ),
-          ),
-        );
+                    },
+                  ),
+                ),
+              );
       },
     );
   }
@@ -889,11 +1078,32 @@ String removeAccents(String input) {
             decoration: const BoxDecoration(
               color: Colors.white,
             ),
-            height: 140,
+            height: 200,
             child: Align(
               alignment: Alignment.topCenter,
               child: Column(
                 children: [
+                  /* Buscar Por Google */
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        setState(() {
+                          miUbicacion = true;
+                        });
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: Colors.black,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        minimumSize: const Size(double.infinity, 50),
+                      ),
+                      child: const Text('Buscar por Google'),
+                    ),
+                  ),
                   Padding(
                     padding: const EdgeInsets.all(8.0),
                     child: ElevatedButton(
