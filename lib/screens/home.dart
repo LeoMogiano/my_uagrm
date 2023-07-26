@@ -334,9 +334,10 @@ class _HomeState extends State<Home> {
     if (miUbicacion) {
       Uri uri = Uri.https(
           "maps.googleapis.com", "/maps/api/place/autocomplete/json", {
-        "input": query,
+        "input": "Santa Cruz de la Sierra $query",
         "key": apiGoogle,
         "language": "es",
+        "components": "country:bo",
       });
       /* print(uri); */
 
@@ -983,6 +984,21 @@ class _HomeState extends State<Home> {
                               miUbicacion = false;
                               bandera = false;
                               addMarker(LatLng(latitude, longitude));
+
+                              final GoogleMapController controller =
+                                  await _mapController;
+                              controller.animateCamera(
+                                CameraUpdate.newCameraPosition(
+                                  CameraPosition(
+                                    target: LatLng(
+                                      inicioLatitude,
+                                      inicioLongitude,
+                                    ),
+                                    zoom: 14.5,
+                                  ),
+                                ),
+                              );
+
                               finMarker = true;
                               setState(() {
                                 search('');
@@ -1092,6 +1108,7 @@ class _HomeState extends State<Home> {
                         setState(() {
                           miUbicacion = true;
                         });
+                        _searchBarController.open();
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.white,
