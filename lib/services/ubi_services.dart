@@ -27,6 +27,7 @@ class UbiService extends ChangeNotifier {
         final List<Ubicaciones> tempUbis =
             Ubicaciones.parseUbicaciones(response.body);
 
+        
         ubicaciones = tempUbis;
         return tempUbis;
       } else if (response.statusCode == 204) {

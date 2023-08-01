@@ -50,6 +50,8 @@ class _HomeState extends State<Home> {
   double inicioLongitude = 0;
   bool finMarker = false;
   bool miUbicacion = false;
+  bool noGoogle = false;
+/*   bool findGoogle = false; */
   bool dosPuntos = false;
   bool bandera = false;
 
@@ -71,7 +73,7 @@ class _HomeState extends State<Home> {
   Set<Polyline> walkingPolylines = {};
 
   List<Map<String, Object>> jsonData = [];
-  List<String?> datosDescription = [];
+  List<Ubicaciones?> datosUbicacion = [];
   List<String?> datosGroup = [];
   List<AutocompletePrediction> placePredictionList = [];
   late UbiService ubiService;
@@ -124,16 +126,31 @@ class _HomeState extends State<Home> {
     speechToText.stop();
   }
 
+  Ubicaciones? getUbicacionForItem(String item) {
+    final ubicacion = ubiService.ubicaciones.firstWhere(
+      (element) => element.description == item,
+      orElse: () => Ubicaciones(description: '', group: '', location: ''),
+    );
+
+    return ubicacion;
+  }
+
   String? getGroupForItem(String item) {
     final ubicacion = ubiService.ubicaciones.firstWhere(
       (element) => element.description == item,
-      orElse: () => Ubicaciones(
-        description: '',
-        group: '',
-      ),
+      orElse: () => Ubicaciones(description: '', group: '', location: ''),
     );
 
     return ubicacion.group;
+  }
+
+  String? getLocationForItem(String item) {
+    final ubicacion = ubiService.ubicaciones.firstWhere(
+      (element) => element.description == item,
+      orElse: () => Ubicaciones(description: '', group: '', location: ''),
+    );
+
+    return ubicacion.location;
   }
 
   Future<GoogleMapController> get _mapController async {
@@ -331,7 +348,7 @@ class _HomeState extends State<Home> {
   }
 
   Future<void> search(String query) async {
-    if (miUbicacion) {
+    if (miUbicacion == true && noGoogle == false) {
       Uri uri = Uri.https(
           "maps.googleapis.com", "/maps/api/place/autocomplete/json", {
         "input": "Santa Cruz de la Sierra $query",
@@ -404,12 +421,12 @@ class _HomeState extends State<Home> {
     } else {
       final combinedResults = getCombinedResults(query);
       setState(() {
-        datosDescription = combinedResults;
+        datosUbicacion = combinedResults;
       });
     }
   }
 
-  List<String?> getCombinedResults(String query) {
+  List<Ubicaciones> getCombinedResults(String query) {
     if (query.isEmpty) {
       return [];
     }
@@ -423,14 +440,11 @@ class _HomeState extends State<Home> {
                     .contains(searchQuery)) ||
             (ubicacion.group != null &&
                 removeAccents(ubicacion.group!.toLowerCase())
+                    .contains(searchQuery)) ||
+            (ubicacion.location != null &&
+                removeAccents(ubicacion.location!.toLowerCase())
                     .contains(searchQuery)))
-        .map((ubicacion) {
-      if (ubicacion.description != null) {
-        return ubicacion.description;
-      } else {
-        return ubicacion.group;
-      }
-    }).toList();
+        .toList();
   }
 
   String removeAccents(String input) {
@@ -705,8 +719,37 @@ class _HomeState extends State<Home> {
                             minimumSize: const Size(double.infinity, 50),
                           ),
                           child: const Text('Cancelar'),
-                          onPressed: () {
+                          onPressed: () async {
                             mostrarMarcador = true;
+                            if (markers.isNotEmpty) {
+                              if (dosPuntos == false) {
+                                miUbicacion = false;
+                                finMarker = false;
+                                dosPuntos = false;
+                                removeMarker(markers.first.markerId);
+                              } else {
+                                removeMarker(markers.first.markerId);
+                                removeMarker(markers.last.markerId);
+                                mostrarMarcador = true;
+                                dosPuntos = false;
+                                finMarker = false;
+                              }
+                            }
+
+                            final GoogleMapController controller =
+                                await _mapController;
+                            controller.animateCamera(
+                              CameraUpdate.newCameraPosition(
+                                CameraPosition(
+                                  target: LatLng(
+                                    currentLocation!.latitude!,
+                                    currentLocation!.longitude!,
+                                  ),
+                                  zoom: 14.5,
+                                ),
+                              ),
+                            );
+                            noGoogle = false;
                             setState(() {});
                           }),
                     ],
@@ -743,8 +786,39 @@ class _HomeState extends State<Home> {
                             minimumSize: const Size(double.infinity, 50),
                           ),
                           child: const Text('Cancelar'),
-                          onPressed: () {
+                          onPressed: () async {
                             miUbicacion = false;
+                            noGoogle = false;
+
+                            if (markers.isNotEmpty) {
+                              if (dosPuntos == false) {
+                                miUbicacion = false;
+                                finMarker = false;
+                                dosPuntos = false;
+                                removeMarker(markers.first.markerId);
+                              } else {
+                                removeMarker(markers.first.markerId);
+                                removeMarker(markers.last.markerId);
+                                mostrarMarcador = true;
+                                dosPuntos = false;
+                                finMarker = false;
+                              }
+                            }
+
+                            final GoogleMapController controller =
+                                await _mapController;
+                            controller.animateCamera(
+                              CameraUpdate.newCameraPosition(
+                                CameraPosition(
+                                  target: LatLng(
+                                    currentLocation!.latitude!,
+                                    currentLocation!.longitude!,
+                                  ),
+                                  zoom: 14.5,
+                                ),
+                              ),
+                            );
+                            noGoogle = false;
                             setState(() {});
                           }),
                     ],
@@ -759,7 +833,7 @@ class _HomeState extends State<Home> {
               child: FloatingActionButton(
                 heroTag: 'add_location',
                 backgroundColor: Colors.red,
-                onPressed: () {
+                onPressed: () async {
                   _completer.future.then((GoogleMapController controller) {
                     controller.getVisibleRegion().then((LatLngBounds bounds) {
                       if (dosPuntos == false) {
@@ -776,6 +850,22 @@ class _HomeState extends State<Home> {
                       }
                     });
                   });
+                  setState(() {
+                    noGoogle = false;
+                    /*  findGoogle = false; */
+                  });
+                  final GoogleMapController controller = await _mapController;
+                  controller.animateCamera(
+                    CameraUpdate.newCameraPosition(
+                      CameraPosition(
+                        target: LatLng(
+                          currentLocation!.latitude!,
+                          currentLocation!.longitude!,
+                        ),
+                        zoom: 14.5,
+                      ),
+                    ),
+                  );
                 },
                 mini: true,
                 child: const Icon(Icons.clear, color: Colors.white),
@@ -929,7 +1019,7 @@ class _HomeState extends State<Home> {
         ),
       ],
       builder: (context, transition) {
-        return miUbicacion
+        return miUbicacion == true && noGoogle == false
             ? ClipRRect(
                 borderRadius: BorderRadius.circular(8),
                 child: Material(
@@ -1000,6 +1090,8 @@ class _HomeState extends State<Home> {
                               );
 
                               finMarker = true;
+                              noGoogle = true;
+                              /* findGoogle = true; */
                               setState(() {
                                 search('');
                                 _searchController.clear();
@@ -1026,39 +1118,30 @@ class _HomeState extends State<Home> {
                   elevation: 4.0,
                   child: ListView.builder(
                     shrinkWrap: true,
-                    itemCount: datosDescription.length,
+                    itemCount: datosUbicacion.length,
                     padding: EdgeInsets.zero,
                     itemBuilder: (context, index) {
-                      final item = datosDescription[index];
-                      final groupValue = getGroupForItem(item!);
+                      final item = datosUbicacion[index];
+                      /* final groupValue = getGroupForItem(item!); */
 
                       return ListTile(
-                        title: Text(item),
-                        subtitle: groupValue != null ? Text(groupValue) : null,
+                        title: Text(item!.description!),
+                        subtitle: Text('${item.group} - ${item.location}'),
                         iconColor: Colors.blue,
                         dense: true,
                         leading: const Icon(Icons.location_on),
                         onTap: () {
                           if (markers.isNotEmpty) {
-                            final data = ubiService.ubicaciones.firstWhere(
-                              (element) => element.description == item,
-                              orElse: () => Ubicaciones(
-                                description: '',
-                                latitude: '0',
-                                longitude: '0',
-                              ),
-                            );
-
                             position = LatLng(
-                              double.parse(data.latitude!),
-                              double.parse(data.longitude!),
+                              double.parse(item.latitude!),
+                              double.parse(item.longitude!),
                             );
 
                             dosPuntos = true;
                             miUbicacion = false;
-                            description = data.description!;
-                            group = data.group!;
-                            initials = data.initials!;
+                            description = item.description!;
+                            group = item.group!;
+                            initials = item.initials!;
 
                             addMarker(position);
 
@@ -1126,6 +1209,7 @@ class _HomeState extends State<Home> {
                     child: ElevatedButton(
                       onPressed: () {
                         mostrarMarcador = false;
+                        noGoogle = true;
                         setState(() {});
                         Navigator.of(context).pop();
                       },
@@ -1143,19 +1227,37 @@ class _HomeState extends State<Home> {
                   Padding(
                     padding: const EdgeInsets.all(8.0),
                     child: ElevatedButton(
-                        onPressed: () {
+                        onPressed: () async {
                           inicioLatitude = currentLocation!.latitude!;
                           inicioLongitude = currentLocation!
                               .longitude!; //currentLocation!.longitude!;
                           mostrarMarcador = true;
                           miUbicacion = true;
+                          noGoogle = true;
                           bandera = false;
                           addMarker(LatLng(
                             currentLocation!.latitude!,
                             currentLocation!.longitude!,
                           ));
+                          final GoogleMapController controller =
+                              await _mapController;
+
+                          controller.animateCamera(
+                            CameraUpdate.newCameraPosition(
+                              CameraPosition(
+                                target: LatLng(
+                                  inicioLatitude,
+                                  inicioLongitude,
+                                ),
+                                zoom: 14.5,
+                              ),
+                            ),
+                          );
                           finMarker = true;
-                          Navigator.of(context).pop();
+                          setState(() {});
+                          if (context.mounted) {
+                            Navigator.of(context).pop();
+                          }
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.white,

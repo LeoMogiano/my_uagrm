@@ -8,6 +8,7 @@ class Ubicaciones {
   final String? longitude;
   final String? group;
   final String? initials;
+  final String? location;
 
   Ubicaciones({
      this.id,
@@ -17,6 +18,7 @@ class Ubicaciones {
     this.longitude,
     this.group,
     this.initials,
+    this.location,
   });
 
   factory Ubicaciones.fromJson(String str) =>
@@ -32,6 +34,7 @@ class Ubicaciones {
         longitude: json["longitude"],
         group: json["group"],
         initials: json["initials"],
+        location: json["location"],
       );
 
   Map<String, dynamic> toMap() => {
@@ -42,6 +45,7 @@ class Ubicaciones {
         "longitude": longitude,
         "group": group,
         "initials": initials,
+        "location": location,
       };
 
   static List<Ubicaciones> parseUbicaciones(String jsonString) {
