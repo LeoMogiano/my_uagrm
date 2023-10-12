@@ -35,6 +35,13 @@ Este proyecto es una aplicación móvil desarrollada en Flutter que utiliza el S
    flutter run
 ```
 
+## Capturas de pantalla
+
+| **Dashboard** | **Search Results** | **Options** |
+|:-------------------:|:--------------------------:|:----------------:|
+| ![Dashboard](./screenshots/s1.png) | ![Search Results](./screenshots/s2.png) | ![Options](./screenshots/s3.png) |
+
+
 
 ## Contribución
 
