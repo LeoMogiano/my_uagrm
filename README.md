@@ -2,6 +2,10 @@
 
 [English](./README.md) | [Español](./README.es.md) | [Français](./README.fr.md) | [日本語](./README.jp.md)
 
+<p align="center">
+  <img loading="lazy" src="./assets/icons/icon.png" alt="Logo" />
+</p>
+
 ## Description
 
 This project is a mobile application developed in Flutter that utilizes the Geographic Information System (GIS) to locate places within Gabriel René Moreno University. The application leverages Google Maps to allow users to mark their starting point and then search and generate routes to different locations within the university campus.
