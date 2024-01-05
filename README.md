@@ -3,7 +3,7 @@
 [English](./README.md) | [Español](./README.es.md) | [Français](./README.fr.md) | [日本語](./README.jp.md)
 
 <p align="center">
-  <img loading="lazy" src="./assets/icons/icon.png" alt="Logo" />
+  <img loading="lazy" width="20%" src="./assets/icons/icon.png" alt="Logo" />
 </p>
 
 ## Description
