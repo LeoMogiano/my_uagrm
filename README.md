@@ -1,41 +1,43 @@
-# Sistema de Información Geográfica para la Universidad Gabriel René Moreno
+# Geographic Information System for Gabriel René Moreno University
 
-## Descripción
+[English](./README.md) | [Español](./README.es.md) | [Français](./README.fr.md) | [日本語](./README.jp.md)
 
-Este proyecto es una aplicación móvil desarrollada en Flutter que utiliza el Sistema de Información Geográfica (SIG) para localizar lugares dentro de la Universidad Gabriel René Moreno. La aplicación aprovecha el mapa de Google Maps para permitir a los usuarios marcar su punto de inicio y luego buscar y generar rutas hacia diferentes lugares dentro del campus universitario.
+## Description
 
-## Características principales
+This project is a mobile application developed in Flutter that utilizes the Geographic Information System (GIS) to locate places within Gabriel René Moreno University. The application leverages Google Maps to allow users to mark their starting point and then search and generate routes to different locations within the university campus.
 
-- **Localización de lugares**: Los usuarios pueden utilizar la aplicación para encontrar lugares específicos dentro de la Universidad Gabriel René Moreno. La aplicación ofrece un buscador integrado que permite a los usuarios buscar un lugar en particular, como una facultad, una biblioteca o un edificio administrativo.
+## Key Features
 
-- **Generación de rutas**: Una vez que el usuario ha seleccionado un lugar de destino, la aplicación genera una ruta utilizando Google Maps para guiar al usuario desde su punto de inicio hasta el lugar seleccionado. La ruta proporciona instrucciones paso a paso para facilitar la navegación dentro del campus universitario.
+- **Location of places**: Users can use the application to find specific places within Gabriel René Moreno University. The application offers an integrated search function that allows users to search for a particular place, such as a faculty, library, or administrative building.
 
-- **Interfaz intuitiva**: La aplicación cuenta con una interfaz de usuario intuitiva y fácil de usar. Los usuarios pueden seleccionar su punto de inicio en el mapa, utilizar el buscador para encontrar el lugar deseado y ver la ruta generada de manera clara y concisa.
+- **Route generation**: Once the user has selected a destination, the application generates a route using Google Maps to guide the user from their starting point to the selected location. The route provides step-by-step instructions to facilitate navigation within the university campus.
 
-## Requisitos del sistema
+- **Intuitive interface**: The application has an intuitive and user-friendly interface. Users can select their starting point on the map, use the search function to find the desired place, and view the generated route clearly and concisely.
 
-- Dispositivo móvil con sistema operativo Android o iOS.
-- Conexión a Internet para acceder a los servicios de Google Maps.
+## System Requirements
 
-## Instalación
+- Mobile device with Android or iOS operating system.
+- Internet connection to access Google Maps services.
 
-1. Clona este repositorio en tu máquina local.
-2. Asegúrate de tener Flutter instalado en tu sistema.
-3. Abre el proyecto en tu editor de código preferido.
-4. Ejecuta el siguiente comando en la terminal para instalar las dependencias del proyecto:
+## Installation
+
+1. Clone this repository to your local machine.
+2. Make sure you have Flutter installed on your system.
+3. Open the project in your preferred code editor.
+4. Execute the following command in the terminal to install project dependencies:
 
 ```shell
    flutter pub get
 ```
 
-5. Conecta tu dispositivo móvil o inicia un emulador.
-6. Ejecuta el siguiente comando para compilar y ejecutar la aplicación:
+5. Connect your mobile device or start an emulator.
+6. Execute the following command to compile and run the application:
 
 ```shell
    flutter run
 ```
 
-## Capturas de pantalla
+## Screenshots
 
 | **Dashboard** | **Search Results** | **Options** |
 |:-------------------:|:--------------------------:|:----------------:|
@@ -43,15 +45,15 @@ Este proyecto es una aplicación móvil desarrollada en Flutter que utiliza el S
 
 
 
-## Contribución
+## Contribution
 
-Si deseas contribuir a este proyecto, sigue estos pasos:
+If you wish to contribute to this project, follow these steps:
 
-1. Haz un fork de este repositorio.
-2. Crea una rama con una descripción clara de la función o corrección que estás realizando.
-3. Realiza tus cambios y realiza un commit con un mensaje descriptivo.
-4. Envía un pull request explicando los cambios realizados y su propósito.
+1. Fork this repository.
+2. Create a branch with a clear description of the feature or fix you are implementing.
+3. Make your changes and commit with a descriptive message.
+4. Submit a pull request explaining the changes made and their purpose.
 
 ## Licencia
 
-Este proyecto se encuentra bajo la licencia [MIT](https://opensource.org/licenses/MIT). Puedes obtener más información consultando el archivo [LICENSE](LICENSE) del proyecto.
+This project is under the [MIT License](https://opensource.org/licenses/MIT). You can obtain more information by consulting the project's [LICENSE](LICENSE) file.
