@@ -2,6 +2,10 @@
 
 [English](./README.md) | [Español](./README.es.md) | [Français](./README.fr.md) | [日本語](./README.jp.md)
 
+<p align="center">
+  <img loading="lazy" width="20%" src="./assets/icons/icon.png" alt="Logo" />
+</p>
+
 ## Description
 
 Ce projet est une application mobile développée en Flutter qui utilise le Système d'Information Géographique (SIG) pour localiser des lieux au sein de l'Université Gabriel René Moreno. L'application exploite la carte de Google Maps pour permettre aux utilisateurs de marquer leur point de départ, puis de rechercher et de générer des itinéraires vers différents endroits à l'intérieur du campus universitaire.

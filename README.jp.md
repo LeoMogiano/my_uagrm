@@ -2,6 +2,10 @@
 
 [English](./README.md) | [Español](./README.es.md) | [Français](./README.fr.md) | [日本語](./README.jp.md)
 
+<p align="center">
+  <img loading="lazy" width="20%" src="./assets/icons/icon.png" alt="Logo" />
+</p>
+
 ## 説明
 
 このプロジェクトは、ガブリエル・レネ・モレノ大学内の場所を特定するために地理情報システム（GIS）を使用するFlutterで開発されたモバイルアプリケーションです。アプリケーションはGoogle Mapsのマップを活用して、ユーザーが出発点をマークし、それからキャンパス内のさまざまな場所への経路を検索および生成できるようにします。
